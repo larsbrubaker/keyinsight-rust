@@ -31,6 +31,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      # cpal's ALSA backend (keyinsight-native audio out) links libasound.
+      - name: Install ALSA headers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
