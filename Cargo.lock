@@ -1368,6 +1368,7 @@ dependencies = [
  "quick-xml 0.36.2",
  "serde",
  "serde_json",
+ "verovio-rust",
  "web-time",
 ]
 
@@ -3024,6 +3025,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "verovio-rust"
+version = "0.1.0"
+dependencies = [
+ "agg-gui",
+ "quick-xml 0.36.2",
 ]
 
 [[package]]

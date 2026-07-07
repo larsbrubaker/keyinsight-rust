@@ -10,6 +10,7 @@ description = "Core training engine, score model, and user interface for the Key
 
 [dependencies]
 agg-gui = { workspace = true }
+verovio-rust = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 web-time = { workspace = true }

@@ -32,6 +32,12 @@ jobs:
           repository: larsbrubaker/agg-gui
           path: agg-gui
 
+      - name: Checkout sibling verovio-rust
+        uses: actions/checkout@v4
+        with:
+          repository: larsbrubaker/verovio-rust
+          path: verovio-rust
+
       - name: Install Rust (stable + wasm32 target)
         uses: dtolnay/rust-toolchain@stable
         with:

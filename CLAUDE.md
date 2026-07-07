@@ -28,7 +28,11 @@ never weaken a test to make it pass.
 `keyinsight-core/tests/file_line_count.rs`. Fix by real refactoring into
 sibling modules — never by compressing code or bumping the limit.
 - **All UI through agg-gui** — no HTML/CSS UI, no separate canvas pipeline.
-Missing primitives get added to `../agg-gui` first.
+  Missing primitives get added to `../agg-gui` first.
+- **Light theme.** The app runs agg-gui's light visuals, and notation always
+  renders as black ink on a light page (music is always light).
+- **Notation goes through `verovio-rust`** (sibling repo, LGPL) — never
+  inline engraving code here (license separation).
 - One green module per commit: `cargo build` clean, all tests pass.
 
 ## Quick commands

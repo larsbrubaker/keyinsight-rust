@@ -8,7 +8,7 @@ source (see `docs/porting.md`).
 | Swift / Apple | Rust port |
 |---|---|
 | SwiftUI views | agg-gui widgets (see `docs/architecture.md`) |
-| Verovio SVG notation via WKWebView | agg-gui-drawn notation: a custom SMuFL-font staff renderer painting through `DrawCtx` (the "custom renderer for the constrained subset" path upstream's architecture doc itself names as the alternative). Per-note recolor, cursor, and ghost notes become ordinary widget painting. |
+| Verovio SVG notation via WKWebView | [verovio-rust](https://github.com/larsbrubaker/verovio-rust) — our Rust port of Verovio engraving, rendering through `DrawCtx` with the Leipzig SMuFL font. It lives in its own repository because Verovio is LGPL-3.0 and this app is MIT; consume it only as the `verovio-rust` library dependency (sibling checkout, like agg-gui). Per-note ids, bounds lookup, color overrides, and the timemap replace Verovio's SVG-id APIs. The score always renders on a light page — music is always light. |
 | SwiftMIDI / CoreMIDI | `midir` on native; Web MIDI API via `wasm-bindgen` on WASM — both behind the core's `MidiPort` trait |
 | AVAudioEngine sampler + metronome | `cpal` output on native; WebAudio on WASM — behind the core's `AudioOut` trait. The SF2 soundfont path may start as a simple synthesized piano tone; fidelity is Phase 2. |
 | SoundpipeAudioKit PitchTap | Port the Swift `YinPitchDetector` (pure DSP, ports directly); mic capture behind the platform trait |

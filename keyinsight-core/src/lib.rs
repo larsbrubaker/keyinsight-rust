@@ -48,6 +48,10 @@ pub trait KeyInSightPlatform: 'static {}
 /// Currently a status screen; it becomes the TrainingView-rooted tree as the
 /// UI modules are ported.
 pub fn build_keyinsight_app<P: KeyInSightPlatform>(font: Arc<Font>, _platform: P) -> App {
+    // KeyInSight is a light-themed app on every platform — sheet music is
+    // black ink on a light page, and the chrome follows (see CLAUDE.md).
+    agg_gui::set_visuals(agg_gui::Visuals::light());
+
     let root = FlexColumn::new()
         .with_gap(12.0)
         .with_padding(24.0)
