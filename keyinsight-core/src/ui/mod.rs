@@ -1,25 +1,41 @@
 //! The user interface layer: agg-gui widgets mirroring the SwiftUI views.
 //!
 //! Ports `Sources/KeyInSight/UI/`: the training root (`app.rs`), side
-//! panel, bottom bar, piano strip, and the Library/Progress sheets. The
-//! CalibrationSheet flow (tempo latency measurement) arrives in Phase 2.
+//! panel, bottom bar, piano strip, and the Library / Progress /
+//! Calibration sheets plus the player dialogs (`sheets/`). Typography
+//! and icons come from the bundled faces in [`fonts`].
 
 pub(crate) mod app;
 pub(crate) mod bottom_bar;
 mod dynamic_label;
+pub(crate) mod fonts;
+mod info_rows;
 mod keyboard_layout;
+mod level_meter;
+pub(crate) mod palette;
 mod piano_strip;
 pub(crate) mod sheets;
 pub(crate) mod side_panel;
 
 pub use app::{build_keyinsight_app, KeyInSightHandles, KeyInSightPlatform};
 pub use dynamic_label::DynamicLabel;
+pub use fonts::UiFonts;
+pub use info_rows::{InfoRow, InfoRows, RowStyle};
 pub use keyboard_layout::{KeyboardKey, KeyboardLayout};
+pub use level_meter::LevelMeter;
 pub use piano_strip::PianoStripWidget;
 
+/// A flexible spacer for `FlexRow`s (the SwiftUI `Spacer()` in an
+/// `HStack`). A plain [`Spacer`](agg_gui::widgets::Spacer) claims all the
+/// available *height* too, blowing up rows laid out inside tall parents —
+/// the height cap keeps it a purely horizontal spring.
+pub(crate) fn hspacer() -> agg_gui::widgets::Spacer {
+    agg_gui::widgets::Spacer::new()
+        .with_max_size(agg_gui::geometry::Size::new(f64::INFINITY, 1.0))
+}
+
 /// Median of a sample list — `CalibrationSheet.median` in Swift (the
-/// calibration flow's latency estimator). Lives here until the full
-/// CalibrationSheet widget is ported.
+/// calibration flow's latency estimator, used by `sheets/calibration`).
 pub fn median(values: &[f64]) -> f64 {
     assert!(!values.is_empty(), "median needs at least one sample");
     let mut sorted = values.to_vec();

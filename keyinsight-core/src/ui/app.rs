@@ -6,20 +6,22 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use agg_gui::color::Color;
 use agg_gui::draw_ctx::DrawCtx;
 use agg_gui::event::{Event, EventResult, Key, Modifiers};
 use agg_gui::geometry::{Rect, Size};
-use agg_gui::text::Font;
+use agg_gui::layout_props::{HAnchor, Insets, VAnchor};
 use agg_gui::widget::Widget;
-use agg_gui::widgets::{FlexColumn, FlexRow, Stack};
+use agg_gui::widgets::{Conditional, Container, FlexColumn, FlexRow, Padding, Separator, Stack};
 use agg_gui::App;
 
 use crate::audio::{AudioOut, NullAudioOut};
 use crate::engine::{default_backend_factory, SessionEngine};
 use crate::notation::NotationWidget;
 use crate::persistence::{AppDatabase, Storage};
+use crate::ui::fonts::{size, UiFonts};
 use crate::ui::side_panel::{self, SidePanelCells};
-use crate::ui::{bottom_bar, sheets, PianoStripWidget};
+use crate::ui::{bottom_bar, sheets, DynamicLabel, PianoStripWidget};
 
 /// Platform capability surface. The native and WASM shells implement this
 /// so the core can obtain platform services without `cfg`-gating
@@ -38,7 +40,24 @@ pub trait KeyInSightPlatform: 'static {
     fn audio(&self) -> Rc<dyn AudioOut> {
         Rc::new(NullAudioOut)
     }
+
+    /// Whether this platform can present a MusicXML file picker; the
+    /// Library sheet only shows Import when true.
+    fn supports_musicxml_import(&self) -> bool {
+        false
+    }
+
+    /// Present a file picker and hand the chosen file's bytes + display
+    /// name (file stem) to `on_file`. May resolve synchronously (native
+    /// dialog) or later (browser input); dropping the callback cancels.
+    fn open_musicxml(&self, on_file: Box<dyn FnOnce(Vec<u8>, String)>) {
+        let _ = on_file;
+    }
 }
+
+/// The platform as a shared trait object — the sheets keep a handle for
+/// capability queries after startup.
+pub type SharedPlatform = Rc<dyn KeyInSightPlatform>;
 
 /// Handles the platform shells keep: tick the engine every frame.
 pub struct KeyInSightHandles {
@@ -162,13 +181,14 @@ pub const TRAINING_ROOT_FOCUS_ID: agg_gui::focus::FocusId = 0x4B49_5349; // "KIS
 /// Build the shared KeyInSight application. Both shells call this and
 /// forward platform input into the returned [`App`].
 pub fn build_keyinsight_app<P: KeyInSightPlatform>(
-    font: Arc<Font>,
+    fonts: UiFonts,
     platform: P,
 ) -> (App, KeyInSightHandles) {
     // KeyInSight is a light-themed app on every platform — sheet music is
     // black ink on a light page, and the chrome follows (see CLAUDE.md).
     agg_gui::set_visuals(agg_gui::Visuals::light());
 
+    let platform: SharedPlatform = Rc::new(platform);
     let clock = host_clock();
     let now_ms = ((clock)() * 1000.0) as i64;
     let db = platform.storage().map(|storage| AppDatabase::open(storage, now_ms));
@@ -195,39 +215,50 @@ pub fn build_keyinsight_app<P: KeyInSightPlatform>(
         }));
     }
 
-    let cells = SidePanelCells {
-        show_library: Rc::new(std::cell::Cell::new(false)),
-        show_progress: Rc::new(std::cell::Cell::new(false)),
-    };
+    let cells = SidePanelCells::new();
 
-    // Center: notation above the beginner keys strip.
-    let notation_widget = {
+    // Center: notation (with the floating inspection callout) above the
+    // beginner keys strip, divided like the Swift VStack.
+    let notation_stack = {
         let controller = engine.borrow().notation.clone();
-        NotationWidget::new(controller, Rc::clone(&clock))
+        Stack::new()
+            .add(Box::new(NotationWidget::new(controller, Rc::clone(&clock))))
+            // Aligned: the callout floats at its natural size in the top-left
+            // corner; pointer events outside it fall through to the score.
+            .add_aligned(Box::new(inspection_overlay(&engine, &fonts)))
     };
+    let keys_divider = Conditional::new(
+        side_panel::engine_state_cell(&engine, |e| e.show_keys() && !e.is_free_play()),
+        Box::new(Separator::horizontal().with_line_inset(0.0)),
+    );
     let center = FlexColumn::new()
         .with_gap(0.0)
-        .add_flex(Box::new(notation_widget), 1.0)
+        .add_flex(Box::new(notation_stack), 1.0)
+        .add(Box::new(keys_divider))
         .add(Box::new(PianoStripWidget::new(
             Rc::clone(&engine),
-            Arc::clone(&font),
+            fonts.clone(),
         )));
 
-    // Main row: notation + side panel.
+    // Main row: notation | side panel.
     let main_row = FlexRow::new()
         .with_gap(0.0)
         .add_flex(Box::new(center), 1.0)
-        .add(side_panel::build_side_panel(&engine, &font, &cells));
+        .add(Box::new(Separator::vertical().with_line_inset(0.0)))
+        .add(side_panel::build_side_panel(&engine, &fonts, &cells));
 
     // Full window: main + bottom bar, with the sheets overlaid.
     let training = FlexColumn::new()
         .with_gap(0.0)
         .add_flex(Box::new(main_row), 1.0)
-        .add(bottom_bar::build_bottom_bar(&engine, &font, &cells));
+        .add(Box::new(Separator::horizontal().with_line_inset(0.0)))
+        .add(bottom_bar::build_bottom_bar(&engine, &fonts, &cells));
 
     let stack = Stack::new()
         .add(Box::new(training))
-        .add(sheets::build_sheet_overlay(&engine, &font, &cells));
+        .add(sheets::build_sheet_overlay(
+            &engine, &fonts, &clock, &cells, &platform,
+        ));
 
     let root = TrainingRoot {
         engine: Rc::clone(&engine),
@@ -243,4 +274,51 @@ pub fn build_keyinsight_app<P: KeyInSightPlatform>(
         App::new(Box::new(root)),
         KeyInSightHandles { engine },
     )
+}
+
+/// The vocabulary hover callout floating over the notation's top-left
+/// corner — the Swift `.thinMaterial` rounded box in `TrainingView`.
+fn inspection_overlay(
+    engine: &Rc<RefCell<SessionEngine>>,
+    fonts: &UiFonts,
+) -> Conditional {
+    let visible = side_panel::engine_state_cell(engine, |e| e.inspection().is_some());
+    let text_engine = Rc::clone(engine);
+    let label = DynamicLabel::new(
+        move || {
+            text_engine
+                .borrow()
+                .inspection()
+                .unwrap_or("")
+                .to_string()
+        },
+        Arc::clone(&fonts.regular),
+    )
+    .with_font_size(size::CALLOUT);
+    let callout = Container::new()
+        .with_background(Color::rgba(1.0, 1.0, 1.0, 0.85))
+        .with_border(Color::rgba(0.0, 0.0, 0.0, 0.12), 1.0)
+        .with_corner_radius(8.0)
+        .with_inner_padding(Insets {
+            left: 10.0,
+            right: 10.0,
+            top: 6.0,
+            bottom: 6.0,
+        })
+        .with_fit_height(true)
+        .add(Box::new(label));
+    Conditional::new(
+        visible,
+        Box::new(Padding::new(
+            Insets {
+                left: 10.0,
+                right: 10.0,
+                top: 10.0,
+                bottom: 10.0,
+            },
+            Box::new(callout),
+        )),
+    )
+    .with_h_anchor(HAnchor::LEFT)
+    .with_v_anchor(VAnchor::TOP)
 }

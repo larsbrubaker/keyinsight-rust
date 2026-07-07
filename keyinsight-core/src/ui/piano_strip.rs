@@ -14,15 +14,16 @@ use agg_gui::color::Color;
 use agg_gui::draw_ctx::DrawCtx;
 use agg_gui::event::{Event, EventResult};
 use agg_gui::geometry::{Rect, Size};
-use agg_gui::text::Font;
 use agg_gui::widget::Widget;
 
 use crate::core::PitchSpelling;
 use crate::engine::SessionEngine;
+use crate::ui::fonts::UiFonts;
+use crate::ui::palette;
 
 pub struct PianoStripWidget {
     engine: Rc<RefCell<SessionEngine>>,
-    font: Arc<Font>,
+    fonts: UiFonts,
     bounds: Rect,
     children: Vec<Box<dyn Widget>>,
 }
@@ -30,10 +31,10 @@ pub struct PianoStripWidget {
 impl PianoStripWidget {
     pub const HEIGHT: f64 = 92.0;
 
-    pub fn new(engine: Rc<RefCell<SessionEngine>>, font: Arc<Font>) -> Self {
+    pub fn new(engine: Rc<RefCell<SessionEngine>>, fonts: UiFonts) -> Self {
         Self {
             engine,
-            font,
+            fonts,
             bounds: Rect::new(0.0, 0.0, 0.0, 0.0),
             children: Vec::new(),
         }
@@ -91,16 +92,18 @@ impl Widget for PianoStripWidget {
         let wrong_flash = engine.wrong_key_flash();
         drop(engine);
 
-        ctx.set_font(Arc::clone(&self.font));
+        // Key names in the bold face — the Swift
+        // `.system(size: 9, weight: .semibold)`.
+        ctx.set_font(Arc::clone(&self.fonts.bold));
         ctx.set_font_size(9.0);
         for key in &layout.keys {
             let is_next = highlighted.contains(&key.midi);
             let is_wrong = wrong_flash == Some(key.midi);
             let key_height = if key.is_black { height * 0.6 } else { height };
             let fill = if is_wrong {
-                Color::from_rgb8(0xD7, 0x30, 0x27)
+                palette::RED
             } else if is_next {
-                Color::rgb(0.11, 0.44, 0.84)
+                palette::KEY_BLUE
             } else if key.is_black {
                 Color::black()
             } else {
@@ -123,7 +126,12 @@ impl Widget for PianoStripWidget {
             if is_next || is_wrong {
                 ctx.set_fill_color(Color::white());
                 let name = PitchSpelling::name(key.midi);
-                ctx.fill_text(&name, x + w / 2.0 - name.len() as f64 * 2.5, y + 4.0);
+                let text_w = ctx
+                    .measure_text(&name)
+                    .map(|m| m.width)
+                    .unwrap_or(name.len() as f64 * 5.0);
+                // Bottom-of-key label (the Swift `.padding(.bottom, 3)`).
+                ctx.fill_text(&name, x + (w - text_w) / 2.0, y + 3.0);
             } else if key.midi == 60 {
                 // Middle C orientation dot.
                 ctx.set_fill_color(Color::rgba(0.5, 0.5, 0.5, 0.45));

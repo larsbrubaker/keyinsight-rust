@@ -20,25 +20,10 @@ pub mod score;
 pub mod skill;
 pub mod ui;
 
-use std::sync::Arc;
-
-use agg_gui::text::Font;
-
-pub use ui::{build_keyinsight_app, KeyInSightHandles, KeyInSightPlatform};
+pub use ui::{build_keyinsight_app, KeyInSightHandles, KeyInSightPlatform, UiFonts};
 
 /// Version stamp reported by the demo site.
 pub const PORT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-/// CascadiaCode bundled into the binary so both targets render identical
-/// glyphs without filesystem access (agg-gui's text stack needs a parsed
-/// `Font` before the first paint). Music glyphs come from verovio-rust's
-/// bundled Leipzig.
-pub const DEFAULT_FONT_BYTES: &[u8] = include_bytes!("../assets/CascadiaCode.ttf");
-
-/// Load the default UI font as an `Arc<Font>`.
-pub fn load_default_font() -> Arc<Font> {
-    Arc::new(Font::from_slice(DEFAULT_FONT_BYTES).expect("keyinsight default font"))
-}
 
 #[cfg(test)]
 mod tests {
@@ -52,7 +37,7 @@ mod tests {
     /// engraved, and laid out into the widget tree).
     #[test]
     fn full_app_builds_and_lays_out() {
-        let (mut app, handles) = build_keyinsight_app(load_default_font(), NoopPlatform);
+        let (mut app, handles) = build_keyinsight_app(UiFonts::bundled(), NoopPlatform);
         app.layout(agg_gui::geometry::Size::new(1180.0, 620.0));
         handles.tick();
         assert_eq!(
@@ -83,7 +68,7 @@ mod tests {
     #[test]
     #[ignore]
     fn dump_tree() {
-        let (mut app, _handles) = build_keyinsight_app(load_default_font(), NoopPlatform);
+        let (mut app, _handles) = build_keyinsight_app(UiFonts::bundled(), NoopPlatform);
         app.layout(agg_gui::geometry::Size::new(1180.0, 620.0));
         dump(app.root(), 0);
     }

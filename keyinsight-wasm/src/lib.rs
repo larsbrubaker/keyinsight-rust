@@ -12,7 +12,7 @@
 
 use demo_wgpu::web_shell;
 use keyinsight_core::persistence::Storage;
-use keyinsight_core::{build_keyinsight_app, load_default_font, KeyInSightPlatform};
+use keyinsight_core::{build_keyinsight_app, KeyInSightPlatform, UiFonts};
 use wasm_bindgen::prelude::*;
 
 const STORAGE_KEY: &str = "keyinsight-db";
@@ -57,7 +57,7 @@ pub fn start() {
     web_shell::start(
         "keyinsight-canvas",
         || {
-            let (app, handles) = build_keyinsight_app(load_default_font(), WasmPlatform);
+            let (app, handles) = build_keyinsight_app(UiFonts::bundled(), WasmPlatform);
             HANDLES.with(|h| *h.borrow_mut() = Some(handles));
             app
         },

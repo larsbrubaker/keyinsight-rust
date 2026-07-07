@@ -71,7 +71,16 @@ substitutions, architecture, build/deploy). verovio-rust has its own
   playback-follow schedule), `NotationWidget` (paints the score, always
   light page, hover-to-name vocabulary).
 - **UI**: training root + side panel + bottom bar + piano strip +
-  Library/Progress sheets, light theme forced app-wide.
+  Library/Progress/Calibration sheets + add/rename player dialogs, light
+  theme forced app-wide. Visual parity pass done (2026-07-07): Inter
+  regular/bold + Cascadia mono + Font Awesome faces (`ui/fonts.rs`),
+  macOS system palette (`ui/palette.rs`), dividers/fixed geometry
+  matching the SwiftUI views, colored status rows with icons + painted
+  beat dots (`InfoRows`), mic `LevelMeter`, boxed instructions,
+  segmented pickers with disabled states, toggle switches, ComboBox
+  player picker, centered modal sheets over a scrim (`agg-gui
+  ModalSheet`), heat-map staff + stat tables in Progress, MusicXML
+  import via `rfd` on native (`KeyInSightPlatform::open_musicxml`).
 
 ## TODO — Phase 2 (rough priority order)
 
@@ -87,16 +96,15 @@ substitutions, architecture, build/deploy). verovio-rust has its own
    permission requests belong in the shim/`main.ts`, never visible UI).
 4. **Mic backend**: platform mic capture → `YinPitchDetector` + `NoteGate`
    (both ported and tested) → `NoteEvent`s; level meter UI.
-5. **CalibrationSheet** (`UI/CalibrationSheet.swift`): latency
-   measurement flow — `engine.calibration_tap` and
-   `set_input_latency()` are already in place; `ui::median` is ported.
+5. ~~**CalibrationSheet**~~ — done (2026-07-07): `ui/sheets/calibration.rs`,
+   tap-along flow with warm-ups, median input-latency compensation,
+   piano keys pass through the modal (`ModalSheet::with_key_passthrough`).
 6. **DemoDriver** (`Engine/DemoDriver.swift`): the scripted `--demo`
    playthrough. The engine surface it needs (`current_expected_midi`,
    tempo debug) exists.
-7. **Text-input overlays**: player add/rename with a TextField (bottom
-   bar currently cycles users and adds "Player N"); when a text field
-   has focus the piano-key routing pauses automatically (root widget
-   focus rules).
+7. ~~**Text-input overlays**~~ — done (2026-07-07):
+   `ui/sheets/player_dialogs.rs`, add/rename dialogs with auto-focused
+   TextField (modal subtree focus routing landed in agg-gui).
 8. **Engraving polish in verovio-rust**: ledger-line coverage check,
    accidental spacing, beam slants, non-linear spacing, glyph metrics
    from `bravura_metadata.json`-style font metadata instead of the fixed
@@ -104,14 +112,17 @@ substitutions, architecture, build/deploy). verovio-rust has its own
    (currently one long system; the notation widget scales to fit).
 9. **Notation widget scroll** for long pieces (Swift used a scrollable
    page + auto-follow; the widget currently scales down).
-10. **Progress sheet heat staff**: `render_progress_staff()` is ported;
-    give the Progress sheet a real notation view instead of text rows.
+10. ~~**Progress sheet heat staff**~~ — done (2026-07-07): the Progress
+    sheet renders the heat-map staff through a dedicated
+    `NotationController` plus the full stat sections and legend.
 11. **PWA polish for the demo site** (icons/manifest like the other apps).
 
 ## Known rough edges
 
-- Side panel instruction text can clip at the panel edge (Label wrapping
-  is width-driven; panel is fixed at 300 px — see `ui/side_panel.rs`).
+- The visual-parity pass depends on unpublished agg-gui additions
+  (`ModalSheet`, `Rebuilder`, `Stack::with_hit_children_only`, modal
+  subtree event routing): agg-gui must be pushed/published before
+  keyinsight CI can build this revision.
 - `Toolkit::layout()`/`render()` panic if called before `load_music_xml`
   (mirrors the C++ toolkit contract; the app never does).
 - The session RNG seeds from wall time at launch (Swift used

@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 
 use keyinsight_core::persistence::Storage;
-use keyinsight_core::{build_keyinsight_app, load_default_font, KeyInSightPlatform};
+use keyinsight_core::{build_keyinsight_app, KeyInSightPlatform, UiFonts};
 
 /// File-backed storage in the platform app-data directory (the port of
 /// `AppDatabase.onDisk()`'s Application Support path).
@@ -60,10 +60,36 @@ impl KeyInSightPlatform for NativePlatform {
     fn storage(&self) -> Option<Box<dyn Storage>> {
         FileStorage::in_app_data().map(|s| Box::new(s) as Box<dyn Storage>)
     }
+
+    fn supports_musicxml_import(&self) -> bool {
+        true
+    }
+
+    /// Native file picker for the Library sheet's Import (the
+    /// `NSOpenPanel` in `LibrarySheet.swift`). `rfd` blocks the event
+    /// loop while open, same as the Swift `runModal()`.
+    fn open_musicxml(&self, on_file: Box<dyn FnOnce(Vec<u8>, String)>) {
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("MusicXML", &["musicxml", "xml"])
+            .pick_file()
+        else {
+            return;
+        };
+        match std::fs::read(&path) {
+            Ok(data) => {
+                let name = path
+                    .file_stem()
+                    .map(|stem| stem.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "Imported".to_string());
+                on_file(data, name);
+            }
+            Err(err) => eprintln!("KeyInSight: couldn't read {}: {err}", path.display()),
+        }
+    }
 }
 
 fn main() {
-    let (app, handles) = build_keyinsight_app(load_default_font(), NativePlatform);
+    let (app, handles) = build_keyinsight_app(UiFonts::bundled(), NativePlatform);
 
     demo_wgpu::native_shell::run(
         demo_wgpu::NativeShellConfig {

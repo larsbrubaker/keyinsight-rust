@@ -37,6 +37,19 @@ impl DynamicLabel {
         self
     }
 
+    /// Wrap to the available width (SwiftUI `fixedSize(horizontal: false,
+    /// vertical: true)` multi-line text).
+    pub fn with_wrap(mut self, wrap: bool) -> Self {
+        self.label = self.label.with_wrap(wrap);
+        self
+    }
+
+    /// Static color override (SwiftUI `.foregroundStyle`).
+    pub fn with_color(mut self, color: Color) -> Self {
+        self.label = self.label.with_color(color);
+        self
+    }
+
     /// Dynamic color (e.g. error counts turning red). `None` = theme text.
     pub fn with_color_fn(mut self, callback: impl Fn() -> Option<Color> + 'static) -> Self {
         self.color_callback = Some(Box::new(callback));

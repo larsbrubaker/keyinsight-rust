@@ -239,3 +239,24 @@ fn user_switch_isolates_progress() {
     assert_eq!(engine.exercises_completed(), 0);
     assert!(engine.recent_exercises(5).is_empty());
 }
+
+/// CalibrationSheet flow: with `calibration_tap` installed and the
+/// exercise clock stopped, simulated piano keys must still reach the tap
+/// callback (the sheet passes keys through to the training root).
+#[test]
+fn calibration_tap_receives_simulated_keys() {
+    let (mut engine, time) = engine();
+    engine.prepare_for_calibration();
+    let taps: Rc<RefCell<Vec<f64>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&taps);
+    engine.calibration_tap = Some(Box::new(move |timestamp| {
+        sink.borrow_mut().push(timestamp);
+    }));
+    let now = *time.borrow();
+    engine.metronome.start(90.0, 4, now + 0.35, now);
+
+    *time.borrow_mut() += 1.0;
+    assert!(engine.handle_simulated_key('a', true, false));
+    engine.handle_simulated_key('a', false, false);
+    assert_eq!(taps.borrow().len(), 1, "note-on must reach the tap hook");
+}
