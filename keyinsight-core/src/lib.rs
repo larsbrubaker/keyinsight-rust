@@ -14,6 +14,7 @@
 //! documented in `docs/porting.md`; until the training loop is up, the app
 //! is a status screen that proves the native + WASM pipelines end to end.
 
+pub mod audio;
 pub mod core;
 pub mod engine;
 pub mod persistence;
