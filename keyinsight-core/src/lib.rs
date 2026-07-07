@@ -17,9 +17,11 @@
 pub mod audio;
 pub mod core;
 pub mod engine;
+pub mod input;
 pub mod persistence;
 pub mod score;
 pub mod skill;
+pub mod ui;
 
 use std::sync::Arc;
 
