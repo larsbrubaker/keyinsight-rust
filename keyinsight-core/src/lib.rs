@@ -18,6 +18,7 @@ pub mod audio;
 pub mod core;
 pub mod engine;
 pub mod input;
+pub mod notation;
 pub mod persistence;
 pub mod score;
 pub mod skill;
