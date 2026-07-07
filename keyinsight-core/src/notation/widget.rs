@@ -69,6 +69,14 @@ impl Widget for NotationWidget {
     }
 
     fn layout(&mut self, available: Size) -> Size {
+        // Reflow long scores into systems fitted to this viewport.
+        if available.width > 0.0 && available.height > 0.0 {
+            if let Ok(controller) = self.controller.try_borrow() {
+                if let Ok(mut renderer) = controller.renderer.try_borrow_mut() {
+                    renderer.fit_view(available.width, available.height);
+                }
+            }
+        }
         available
     }
 

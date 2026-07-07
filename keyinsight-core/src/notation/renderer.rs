@@ -20,6 +20,8 @@ pub struct Rendered {
 pub struct NotationRenderer {
     toolkit: Toolkit,
     layout_options: LayoutOptions,
+    /// The widget viewport the engraving is fitted to (whole px).
+    view: Option<(f64, f64)>,
 }
 
 impl Default for NotationRenderer {
@@ -33,6 +35,7 @@ impl NotationRenderer {
         Self {
             toolkit: Toolkit::new(),
             layout_options: LayoutOptions::default(),
+            view: None,
         }
     }
 
@@ -46,7 +49,9 @@ impl NotationRenderer {
     /// subset (the Swift renderer returned nil on toolkit failure).
     pub fn render(&mut self, music_xml: &str) -> Option<Rendered> {
         self.toolkit.load_music_xml(music_xml).ok()?;
-        let layout = self.toolkit.layout(&self.layout_options);
+        self.toolkit.layout(&self.layout_options);
+        self.apply_fit();
+        let layout = self.toolkit.current_layout()?;
 
         let mut note_ids: Vec<String> = Vec::new();
         let mut note_groups: Vec<(f64, Vec<String>)> = Vec::new();
@@ -67,5 +72,59 @@ impl NotationRenderer {
     /// bounds queries go through it).
     pub fn toolkit(&self) -> &Toolkit {
         &self.toolkit
+    }
+
+    /// Wrap systems at `width` layout pixels: long scores flow onto
+    /// multiple rows. Element ids are stable across relayouts, so
+    /// feedback coloring and cursor state carry over.
+    pub fn set_system_width(&mut self, width: f64) {
+        // Whole pixels, and never so narrow that a single measure can't
+        // fit — avoids relayout churn from sub-pixel resize noise.
+        let width = Some(width.round().max(200.0));
+        if self.layout_options.system_width == width {
+            return;
+        }
+        self.layout_options.system_width = width;
+        if self.toolkit.current_layout().is_some() {
+            self.toolkit.layout(&self.layout_options);
+        }
+    }
+
+    /// Fit the engraving to a widget viewport, like the Swift page
+    /// reflowing on resize: try a few wrap widths and keep the one whose
+    /// fitted (uniform) scale reads largest. Re-runs when the viewport
+    /// changes and after each new score engraves.
+    pub fn fit_view(&mut self, view_w: f64, view_h: f64) {
+        let view = (view_w.round().max(1.0), view_h.round().max(1.0));
+        if self.view == Some(view) {
+            return;
+        }
+        self.view = Some(view);
+        self.apply_fit();
+    }
+
+    fn apply_fit(&mut self) {
+        let Some((view_w, view_h)) = self.view else {
+            return;
+        };
+        if self.toolkit.current_layout().is_none() {
+            return;
+        }
+        // Wider rows = fewer, shorter systems; narrower rows use the full
+        // width. The best trade depends on the score, so measure it.
+        let mut best: (f64, Option<f64>) = (f64::MIN, None);
+        for factor in [1.0, 1.5, 2.0, 3.0, 4.0] {
+            let candidate = Some((view_w * factor).round().max(200.0));
+            self.layout_options.system_width = candidate;
+            let layout = self.toolkit.layout(&self.layout_options);
+            let scale = (view_w / layout.width)
+                .min(view_h / layout.height)
+                .min(1.6);
+            if scale > best.0 {
+                best = (scale, candidate);
+            }
+        }
+        self.layout_options.system_width = best.1;
+        self.toolkit.layout(&self.layout_options);
     }
 }

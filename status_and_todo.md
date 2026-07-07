@@ -115,8 +115,10 @@ substitutions, architecture, build/deploy). verovio-rust has its own
 8. **Engraving polish in verovio-rust**: ledger-line coverage check,
    accidental spacing, beam slants, non-linear spacing, glyph metrics
    from `bravura_metadata.json`-style font metadata instead of the fixed
-   width table, multi-system line breaking for long repertoire
-   (currently one long system; the notation widget scales to fit).
+   width table. Multi-system line breaking is done (2026-07-07):
+   `LayoutOptions::system_width` wraps measures into rows, and the
+   notation widget picks the wrap width that maximizes the fitted scale
+   (`NotationRenderer::fit_view`).
 9. **Notation widget scroll** for long pieces (Swift used a scrollable
    page + auto-follow; the widget currently scales down).
 10. ~~**Progress sheet heat staff**~~ — done (2026-07-07): the Progress

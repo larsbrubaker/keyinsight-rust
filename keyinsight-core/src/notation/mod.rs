@@ -16,3 +16,71 @@ pub use controller::{NotationController, NoteState};
 pub use renderer::{NotationRenderer, Rendered};
 pub use vocabulary::NotationVocabulary;
 pub use widget::NotationWidget;
+
+#[cfg(test)]
+mod wrap_tests {
+    use super::*;
+
+    /// Long repertoire flows onto multiple systems at the widget width
+    /// (dump: `cargo test dump_wrapped_gymnopedie -- --ignored --nocapture`).
+    #[test]
+    fn long_pieces_wrap_at_the_system_width() {
+        let xml = String::from_utf8_lossy(include_bytes!(
+            "../../assets/pieces/gymnopedie-1.musicxml"
+        ))
+        .into_owned();
+        let mut renderer = NotationRenderer::new();
+        renderer.set_system_width(860.0);
+        renderer.render(&xml).expect("gymnopedie engraves");
+        let layout = renderer.toolkit().current_layout().expect("layout");
+        assert!(
+            layout.width <= 860.0,
+            "wrapped inside the widget width, got {}",
+            layout.width
+        );
+        assert!(
+            layout.height > layout.width * 0.5,
+            "94 notes stack into multiple rows (height {})",
+            layout.height
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn dump_wrapped_gymnopedie() {
+        let xml = String::from_utf8_lossy(include_bytes!(
+            "../../assets/pieces/gymnopedie-1.musicxml"
+        ))
+        .into_owned();
+        let mut renderer = NotationRenderer::new();
+        renderer.fit_view(871.0, 567.0);
+        renderer.render(&xml).expect("gymnopedie engraves");
+        let (width, height) = {
+            let layout = renderer.toolkit().current_layout().unwrap();
+            (layout.width.ceil() as u32, layout.height.ceil() as u32)
+        };
+        let mut framebuffer = agg_gui::framebuffer::Framebuffer::new(width, height);
+        let mut ctx = agg_gui::gfx_ctx::GfxCtx::new(&mut framebuffer);
+        agg_gui::draw_ctx::DrawCtx::clear(&mut ctx, agg_gui::color::Color::white());
+        let font = verovio_rust::leipzig_font();
+        renderer.toolkit().render(
+            &mut ctx,
+            &font,
+            0.0,
+            height as f64,
+            &verovio_rust::RenderOptions::default(),
+        );
+        drop(ctx);
+        let mut out = format!("P6\n{width} {height}\n255\n").into_bytes();
+        let px = framebuffer.pixels();
+        for y in (0..height as usize).rev() {
+            for x in 0..width as usize {
+                let i = (y * width as usize + x) * 4;
+                out.extend_from_slice(&px[i..i + 3]);
+            }
+        }
+        let path = std::env::temp_dir().join("gymnopedie_wrapped.ppm");
+        std::fs::write(&path, out).unwrap();
+        println!("wrote {}", path.display());
+    }
+}
