@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = ["keyinsight-core", "keyinsight-native", "keyinsight-wasm"]
+default-members = ["keyinsight-core", "keyinsight-native"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.78"
+authors = ["Lars Brubaker <larsbrubaker@matterhackers.com>"]
+license = "MIT"
+repository = "https://github.com/larsbrubaker/keyinsight-rust"
+
+[workspace.dependencies]
+agg-gui = "0.2"
+demo-wgpu = { path = "../agg-gui/demo-wgpu", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+web-time = "1"
+
+# ---------------------------------------------------------------------------
+# Local development override — see CLAUDE.md "Local development uses agg-gui
+# as a path dep". The rust-apps superproject lays out agg-gui as a sibling at
+# ../agg-gui/. CI clones it the same way so this patch resolves both locally
+# and in Actions.
+# ---------------------------------------------------------------------------
+[patch.crates-io]
+agg-gui = { path = "../agg-gui/agg-gui" }
+
+# ---------------------------------------------------------------------------
+# Optimize dependencies in debug builds. The agg-rust software rasterizer is
+# expensive unoptimized — without this dev frame time drops sharply. Mirrors
+# agg-gui's own workspace profile.
+# ---------------------------------------------------------------------------
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+[profile.release.package."*"]
+opt-level = 3

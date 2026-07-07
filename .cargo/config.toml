@@ -1,0 +1,17 @@
+[alias]
+# `cargo dev` — hot-reload the native shell on every save.
+#
+# Requires `cargo install cargo-watch` (one-time). The native binary is the
+# fastest iteration loop; the WASM path is intentionally separate so its
+# wasm-pack rebuild doesn't run on every edit.
+dev = [
+    "watch",
+    "-i",
+    "target",
+    "-i",
+    "demo/public/pkg",
+    "-i",
+    "keyinsight-wasm/pkg",
+    "-x",
+    "run -p keyinsight-native",
+]

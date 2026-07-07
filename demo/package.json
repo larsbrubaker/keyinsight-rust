@@ -1,0 +1,16 @@
+{
+  "name": "keyinsight-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "wasm": "wasm-pack build ../keyinsight-wasm --target web --out-dir ../demo/public/pkg --no-typescript"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0"
+  }
+}

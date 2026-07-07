@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout keyinsight-rust
+        uses: actions/checkout@v4
+        with:
+          path: keyinsight-rust
+
+      # The workspace Cargo.toml patches agg-gui to ../agg-gui/agg-gui (see
+      # docs/architecture.md), so CI needs the sibling layout.
+      - name: Checkout sibling agg-gui (path-patched in Cargo.toml)
+        uses: actions/checkout@v4
+        with:
+          repository: larsbrubaker/agg-gui
+          path: agg-gui
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            keyinsight-rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('keyinsight-rust/Cargo.lock') }}
+
+      - name: Build native
+        working-directory: keyinsight-rust
+        run: cargo build --workspace
+
+      - name: Run tests
+        working-directory: keyinsight-rust
+        run: cargo test --workspace
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout keyinsight-rust
+        uses: actions/checkout@v4
+        with:
+          path: keyinsight-rust
+
+      - name: Checkout sibling agg-gui
+        uses: actions/checkout@v4
+        with:
+          repository: larsbrubaker/agg-gui
+          path: agg-gui
+
+      - name: Install Rust + wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM
+        working-directory: keyinsight-rust
+        run: |
+          wasm-pack build keyinsight-wasm \
+            --target web \
+            --out-dir ../demo/public/pkg \
+            --no-typescript

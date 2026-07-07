@@ -1,0 +1,24 @@
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+node_modules/
+demo/dist
+demo/public/pkg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# WASM
+/pkg
+keyinsight-wasm/pkg
+
+# Claude Code / Cursor agent state
+.claude/
+.cursor/
