@@ -62,8 +62,11 @@ substitutions, architecture, build/deploy). verovio-rust has its own
   per-user) as one serde document behind the `Storage` trait
   (native = file, wasm = localStorage, tests = memory).
 - **Audio**: YIN pitch detector + `NoteGate` (pure DSP, ready for the mic
-  backend), SMF encoder, metronome clock over the `AudioOut` trait
-  (currently `NullAudioOut` everywhere — silent, clock still runs).
+  backend), SMF encoder, metronome clock over the `AudioOut` trait, and
+  real output on both shells (2026-07-07): synthesized clicks + OxiSynth
+  SF2 piano rendering in `audio::synth`, played through cpal
+  (`keyinsight-native/src/audio.rs`) and WebAudio
+  (`keyinsight-wasm/src/audio.rs`); `NullAudioOut` remains for tests.
 - **Input**: simulated keyboard backend (focus-routed through the
   `TrainingRoot` widget), unplugged backend.
 - **Notation**: `NotationRenderer` (wraps verovio-rust), feedback
@@ -88,12 +91,16 @@ substitutions, architecture, build/deploy). verovio-rust has its own
    `keyinsight-native`, feed the engine's `event_queue`, wire the
    `BackendFactory` (see `default_backend_factory` — it currently
    substitutes the simulated backend for MIDI/mic).
-2. **Native audio out** (`cpal`): implement `AudioOut` (metronome clicks =
-   synthesized sine bursts per `Metronome.swift`; SMF playback needs a
-   small sampler/synth — start with a simple synthesized piano tone, the
-   Swift architecture doc sanctions that).
-3. **Web MIDI + WebAudio** in `keyinsight-wasm` (same two traits;
-   permission requests belong in the shim/`main.ts`, never visible UI).
+2. ~~**Native audio out**~~ — done (2026-07-07): `keyinsight-native/src/audio.rs`
+   (cpal mixer on the host clock). Clicks are the Swift sine bursts;
+   Hear It renders the SMF through OxiSynth + the bundled CC0
+   Upright Piano KW small SF2 (`keyinsight-core/src/audio/synth.rs`),
+   with an additive-synthesis fallback. `keyinsight-native --audio-smoke`
+   plays an arpeggio + clicks headlessly.
+3. **Web MIDI** in `keyinsight-wasm` (WebAudio out is done —
+   `keyinsight-wasm/src/audio.rs`; MIDI permission requests belong in the
+   shim/`main.ts`, never visible UI). Note: the SF2 is embedded, putting
+   the wasm at ~18 MB — consider lazy-fetching it if load time matters.
 4. **Mic backend**: platform mic capture → `YinPitchDetector` + `NoteGate`
    (both ported and tested) → `NoteEvent`s; level meter UI.
 5. ~~**CalibrationSheet**~~ — done (2026-07-07): `ui/sheets/calibration.rs`,
@@ -119,10 +126,8 @@ substitutions, architecture, build/deploy). verovio-rust has its own
 
 ## Known rough edges
 
-- The visual-parity pass depends on unpublished agg-gui additions
-  (`ModalSheet`, `Rebuilder`, `Stack::with_hit_children_only`, modal
-  subtree event routing): agg-gui must be pushed/published before
-  keyinsight CI can build this revision.
+- keyinsight CI builds against the pushed sibling agg-gui clone; local
+  work that adds agg-gui features must push agg-gui before keyinsight.
 - `Toolkit::layout()`/`render()` panic if called before `load_music_xml`
   (mirrors the C++ toolkit contract; the app never does).
 - The session RNG seeds from wall time at launch (Swift used

@@ -11,10 +11,12 @@ mod tests;
 
 mod metronome;
 mod midi_file_encoder;
+pub mod synth;
 mod yin;
 
 pub use metronome::Metronome;
 pub use midi_file_encoder::MidiFileEncoder;
+pub use synth::{click_samples, parse_smf, render_smf, Clip, SmfNote};
 pub use yin::{Detection, GateAction, NoteGate, YinPitchDetector};
 
 /// Platform audio output. All methods are fire-and-forget; failures are the

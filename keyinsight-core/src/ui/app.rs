@@ -73,10 +73,10 @@ impl KeyInSightHandles {
 }
 
 /// The monotonic host clock every NoteEvent carries (`CACurrentMediaTime`
-/// in Swift). `web_time` keeps it wasm-clean.
+/// in Swift) — the crate-global [`crate::host_now`], shared with the
+/// platform audio shells so scheduled clicks land on the same timeline.
 fn host_clock() -> Rc<dyn Fn() -> f64> {
-    let start = web_time::Instant::now();
-    Rc::new(move || start.elapsed().as_secs_f64())
+    Rc::new(crate::host_now)
 }
 
 /// Root widget: hosts the whole tree, ticks the engine every painted

@@ -235,3 +235,99 @@ fn durations_and_start_times() {
     assert!((starts[0] - 0.0).abs() < 1e-9);
     assert!((starts[1] - 2.0).abs() < 1e-9); // after quarter + rest
 }
+
+// --- synth (click buffers + SMF piano rendering) ---
+
+/// The Swift `makeClick` constants: 30 ms at the sample rate, silent by
+/// the end, accent louder than the beat click.
+#[test]
+fn click_buffers_match_metronome_constants() {
+    let rate = 44_100.0;
+    let click = crate::audio::click_samples(rate, false);
+    let accent = crate::audio::click_samples(rate, true);
+    assert_eq!(click.len(), (rate * 0.03) as usize);
+    assert_eq!(accent.len(), click.len());
+    let click_peak = click.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+    let accent_peak = accent.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+    assert!(accent_peak > click_peak, "accent is louder");
+    // Decayed to near silence by the end of the burst.
+    assert!(click.last().unwrap().abs() < 0.01);
+}
+
+/// The parser reads back exactly what the encoder wrote: note count,
+/// onsets on the eighth-note grid, and the gate-shortened durations.
+#[test]
+fn smf_parse_round_trips_the_encoder() {
+    let exercise = Exercise::new(
+        vec![
+            ScoreNote::note(60, NoteDuration::Quarter),
+            ScoreNote::note(64, NoteDuration::Eighth),
+            ScoreNote::note(67, NoteDuration::Half),
+        ],
+        4,
+    );
+    let bpm = 90.0;
+    let smf = MidiFileEncoder::encode(&exercise, bpm, 0);
+    let notes = crate::audio::parse_smf(&smf).expect("encoder output parses");
+
+    assert_eq!(notes.len(), 3);
+    let unit = (60.0 / bpm) / 2.0; // eighth-note seconds
+    let expected_starts = [0.0, 2.0 * unit, 3.0 * unit];
+    for (note, (expected_start, midi, units)) in notes
+        .iter()
+        .zip([(0.0, 60u8, 2.0), (expected_starts[1], 64, 1.0), (expected_starts[2], 67, 4.0)])
+    {
+        let _ = expected_start;
+        assert_eq!(note.midi, midi);
+        let expected_duration = units * unit * MidiFileEncoder::GATE_RATIO;
+        // Tick + tempo-microsecond quantization: within one MIDI tick.
+        let tick = unit / MidiFileEncoder::TICKS_PER_UNIT as f64;
+        assert!(
+            (note.duration_seconds - expected_duration).abs() < tick,
+            "gate-shortened duration for midi {midi}: {} vs {expected_duration}",
+            note.duration_seconds
+        );
+    }
+    assert!((notes[0].start_seconds - 0.0).abs() < 1e-9);
+    assert!((notes[1].start_seconds - 2.0 * unit).abs() < 1e-6);
+    assert!((notes[2].start_seconds - 3.0 * unit).abs() < 1e-6);
+}
+
+/// Rendering produces a clip covering the exercise plus the release
+/// tail, actually contains sound, and stays inside the headroom.
+#[test]
+fn smf_renders_to_audible_bounded_pcm() {
+    let exercise = Exercise::new(
+        vec![
+            ScoreNote::note(60, NoteDuration::Quarter),
+            ScoreNote::note(64, NoteDuration::Quarter),
+        ],
+        4,
+    );
+    let bpm = 120.0;
+    let smf = MidiFileEncoder::encode(&exercise, bpm, 0);
+    let clip = crate::audio::render_smf(&smf, 44_100.0).expect("renders");
+
+    let content_seconds = MidiFileEncoder::duration(&exercise, bpm);
+    assert!(clip.duration_seconds() > content_seconds * MidiFileEncoder::GATE_RATIO);
+    let peak = clip.samples.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+    assert!(peak > 0.05, "clip is audible (peak {peak})");
+    assert!(peak <= 0.9 + 1e-3, "clip stays inside headroom (peak {peak})");
+}
+
+/// Chords (shared onset) parse as overlapping notes rather than a
+/// sequence.
+#[test]
+fn smf_parse_keeps_chords_simultaneous() {
+    let exercise = Exercise::new(
+        vec![
+            ScoreNote::note(60, NoteDuration::Quarter),
+            ScoreNote::note(64, NoteDuration::Quarter).with_chord(true),
+        ],
+        4,
+    );
+    let smf = MidiFileEncoder::encode(&exercise, 100.0, 0);
+    let notes = crate::audio::parse_smf(&smf).expect("parses");
+    assert_eq!(notes.len(), 2);
+    assert!((notes[0].start_seconds - notes[1].start_seconds).abs() < 1e-9);
+}

@@ -10,7 +10,12 @@
 
 #![cfg(target_arch = "wasm32")]
 
+mod audio;
+
+use std::rc::Rc;
+
 use demo_wgpu::web_shell;
+use keyinsight_core::audio::AudioOut;
 use keyinsight_core::persistence::Storage;
 use keyinsight_core::{build_keyinsight_app, KeyInSightPlatform, UiFonts};
 use wasm_bindgen::prelude::*;
@@ -44,6 +49,12 @@ struct WasmPlatform;
 impl KeyInSightPlatform for WasmPlatform {
     fn storage(&self) -> Option<Box<dyn Storage>> {
         Some(Box::new(LocalStorage))
+    }
+
+    /// Metronome clicks + Hear It playback through WebAudio (silent
+    /// fallback when the browser refuses a context).
+    fn audio(&self) -> Rc<dyn AudioOut> {
+        Rc::new(audio::WebAudioOut::new())
     }
 }
 

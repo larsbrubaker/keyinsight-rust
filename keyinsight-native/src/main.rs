@@ -8,8 +8,12 @@
 //! MIDI via midir and audio out via cpal land here next — see
 //! `docs/platform-substitutions.md`) and the per-frame engine tick.
 
-use std::path::PathBuf;
+mod audio;
 
+use std::path::PathBuf;
+use std::rc::Rc;
+
+use keyinsight_core::audio::AudioOut;
 use keyinsight_core::persistence::Storage;
 use keyinsight_core::{build_keyinsight_app, KeyInSightPlatform, UiFonts};
 
@@ -61,6 +65,12 @@ impl KeyInSightPlatform for NativePlatform {
         FileStorage::in_app_data().map(|s| Box::new(s) as Box<dyn Storage>)
     }
 
+    /// Metronome clicks + Hear It playback through the default output
+    /// device (silent fallback when none exists).
+    fn audio(&self) -> Rc<dyn AudioOut> {
+        Rc::new(audio::CpalAudioOut::new())
+    }
+
     fn supports_musicxml_import(&self) -> bool {
         true
     }
@@ -89,6 +99,13 @@ impl KeyInSightPlatform for NativePlatform {
 }
 
 fn main() {
+    // Headless audio diagnostic: play a C-major arpeggio + two clicks
+    // through the real output path and exit (`keyinsight-native --audio-smoke`).
+    if std::env::args().any(|arg| arg == "--audio-smoke") {
+        audio_smoke();
+        return;
+    }
+
     let (app, handles) = build_keyinsight_app(UiFonts::bundled(), NativePlatform);
 
     demo_wgpu::native_shell::run(
@@ -101,4 +118,28 @@ fn main() {
         // actions, metronome sweep).
         move || handles.tick(),
     );
+}
+
+fn audio_smoke() {
+    use keyinsight_core::audio::MidiFileEncoder;
+    use keyinsight_core::score::{Exercise, NoteDuration, ScoreNote};
+
+    let out = audio::CpalAudioOut::new();
+    let exercise = Exercise::new(
+        vec![
+            ScoreNote::note(60, NoteDuration::Quarter),
+            ScoreNote::note(64, NoteDuration::Quarter),
+            ScoreNote::note(67, NoteDuration::Quarter),
+            ScoreNote::note(72, NoteDuration::Half),
+        ],
+        4,
+    );
+    let smf = MidiFileEncoder::encode(&exercise, 120.0, 0);
+    let playing = out.play_smf(&smf);
+    let now = keyinsight_core::host_now();
+    out.play_click(now + 0.5, true);
+    out.play_click(now + 1.0, false);
+    println!("audio-smoke: play_smf accepted = {playing}");
+    std::thread::sleep(std::time::Duration::from_millis(3500));
+    println!("audio-smoke: done");
 }

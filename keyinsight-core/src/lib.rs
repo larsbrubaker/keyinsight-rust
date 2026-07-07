@@ -25,6 +25,17 @@ pub use ui::{build_keyinsight_app, KeyInSightHandles, KeyInSightPlatform, UiFont
 /// Version stamp reported by the demo site.
 pub const PORT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// The shared monotonic host clock (the `CACurrentMediaTime` domain):
+/// seconds since first use. Every NoteEvent timestamp, metronome beat,
+/// and [`audio::AudioOut`] schedule time lives on this one clock, so the
+/// platform audio shells can map "host seconds" to their device
+/// timelines. `web_time` keeps it wasm-clean.
+pub fn host_now() -> f64 {
+    use std::sync::OnceLock;
+    static EPOCH: OnceLock<web_time::Instant> = OnceLock::new();
+    EPOCH.get_or_init(web_time::Instant::now).elapsed().as_secs_f64()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

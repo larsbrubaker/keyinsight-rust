@@ -15,6 +15,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 web-time = { workspace = true }
 quick-xml = "0.36"
+oxisynth = "0.1"
 
 [lib]
 crate-type = ["rlib"]

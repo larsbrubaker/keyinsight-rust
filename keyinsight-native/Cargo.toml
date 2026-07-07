@@ -20,3 +20,4 @@ agg-gui = { workspace = true, features = ["clipboard"] }
 # demo-wgpu's `native_shell` — this crate is only the app-specific glue.
 demo-wgpu = { workspace = true }
 rfd = "0.17.2"
+cpal = "0.15"
